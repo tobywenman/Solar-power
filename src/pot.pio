@@ -1,0 +1,27 @@
+.program pot
+.wrap_target
+    out x, 7
+    out pins, 1
+loop:
+    set pins, 1 
+    set pins, 0 
+    jmp x--, loop
+.wrap
+
+% c-sdk {
+#include "hardware/clocks.h"
+
+void pot_program_setup(PIO pio, uint sm, uint offset, uint inc, uint upDown,float freq){
+    pio_gpio_init(pio,inc);
+    pio_sm_set_consecutive_pindirs(pio, sm, inc, 1, true);
+    pio_gpio_init(pio,upDown);
+    pio_sm_set_consecutive_pindirs(pio, sm, upDown, 1, true);
+    pio_sm_config c = pot_program_get_default_config(offset);
+    sm_config_set_set_pins(&c,inc,1);
+    sm_config_set_out_pins(&c,upDown,1);
+    float div = clock_get_hz(clk_sys) / (freq); 
+    sm_config_set_clkdiv(&c, div);
+    sm_config_set_out_shift(&c, true, true, 8);
+    pio_sm_init(pio,sm,offset,&c);
+}
+%}
