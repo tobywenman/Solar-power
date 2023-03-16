@@ -23,6 +23,34 @@ void resetWiper(PIO pio, uint sm){
     shiftWiper(100,true,pio,sm);
 }
 
+void setVoltage(PIO pio, uint sm, float voltage){
+    float wiperPos = 2 - 3.936/voltage;
+    int steps = (int)(wiperPos*100);
+    if (steps > 100){
+        steps = 100;
+    }
+    else if (steps < 0){
+        steps = 0;
+    }
+    resetWiper(pio,sm);
+    shiftWiper(steps,false,pio,sm);
+    printf("voltage: %f\n",voltage);
+    printf("steps %d\n",steps);
+    printf("wiper pos %f\n",wiperPos);
+}
+
+void updateCurrent(float current,PIO pio,uint sm){
+    adc_select_input(0);
+    float readCurrent = ((float) adc_read())*0.0007324;
+
+    if (readCurrent < current) {
+        shiftWiper(0,false,pio,sm);
+    }
+    else{
+        shiftWiper(0,true,pio,sm);
+    }
+}
+
 int main(){
     adc_init();
     adc_gpio_init(26);
@@ -50,6 +78,11 @@ int main(){
     char inp;
     bool power = true;
 
+    float voltage = 2.5;
+
+    uint adcRaw;
+    float voltDrop;
+
     while(1){
         
         // if (wiper < 100){
@@ -68,27 +101,28 @@ int main(){
         switch (inp)
         {
         case 'u':
-            shiftWiper(0,false,pio,sm);
             printf("voltage up\n");
+            shiftWiper(0,false,pio,sm);
             break;
         case 'd':
-            shiftWiper(0,true,pio,sm);
             printf("voltage down\n");
+            shiftWiper(0,true,pio,sm);
             break;
-        case 't':
-            power = !power;
-            gpio_put(BUCK_ENABLE,power);
-            gpio_put(LED_PIN,power);
-            printf("power toggled: %d\n",power);
-            break;
-        case 'r':
-            resetWiper(pio,sm);
-            printf("wiper reset\n");
+        case 'o':
+            adcRaw = adc_read();
+            voltDrop = (float)(adcRaw);
+            printf("voltage drop raw %f\n",voltDrop);
+            voltDrop *= 0.0007324;
+            printf("voltage drop %f\n",voltDrop);
+
+            printf("adc value %u\n",adcRaw);
+            
+
             break;
         default:
             break;
         }
-        
+        //setVoltage(pio,sm,voltage);
     }
 }
 
