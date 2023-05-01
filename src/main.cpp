@@ -34,27 +34,49 @@ void setVoltage(PIO pio, uint sm, float voltage){
     }
     resetWiper(pio,sm);
     shiftWiper(steps,false,pio,sm);
-    printf("voltage: %f\n",voltage);
-    printf("steps %d\n",steps);
-    printf("wiper pos %f\n",wiperPos);
 }
 
-void updateCurrent(float current,PIO pio,uint sm){
+void mppt(float maxCurrent,float maxVoltage,PIO pio,uint sm){
+
+    static float prevPower = 0;
+    static bool peturbUp = false;
+
     adc_select_input(0);
     float readCurrent = ((float) adc_read())*0.0007324;
+    adc_select_input(1);
+    float readVoltage = ((float)adc_read())*0.000982;
 
-    if (readCurrent < current) {
+    float measuredPower = readCurrent*readVoltage;
+    
+    printf("power %f\n", measuredPower);
+    printf("current %f\n",readCurrent);
+    printf("voltage %f\n",readVoltage);
+
+    if (readVoltage > maxVoltage){
+        setVoltage(pio,sm,maxVoltage);
+    }
+    else if (readCurrent < 0.1){
         shiftWiper(0,false,pio,sm);
     }
-    else{
+    else if (readCurrent > maxCurrent){
         shiftWiper(0,true,pio,sm);
+    }
+    else if(measuredPower > prevPower){
+        shiftWiper(0,peturbUp,pio,sm);
+        prevPower = measuredPower;
+    }
+    else{
+        peturbUp = !peturbUp;
+        prevPower = measuredPower;
+        shiftWiper(0,peturbUp,pio,sm);
     }
 }
 
 int main(){
     adc_init();
     adc_gpio_init(26);
-    adc_select_input(0);
+    adc_gpio_init(27);
+    adc_select_input(1);
     stdio_init_all();
     gpio_init(LED_PIN);
     gpio_set_dir(LED_PIN, GPIO_OUT);
@@ -82,47 +104,11 @@ int main(){
 
     uint adcRaw;
     float voltDrop;
+    float vOut;
 
     while(1){
-        
-        // if (wiper < 100){
-        //     shiftWiper(0,false,pio,sm);
-        //     wiper+=1;
-        // }
-        // else{
-        //     wiper = 0;
-        //     resetWiper(pio,sm);
-        // }
-
-        printf("Voltage up/down/toggle power/r u/d/t/r:\n");
-
-        inp = getchar();
-
-        switch (inp)
-        {
-        case 'u':
-            printf("voltage up\n");
-            shiftWiper(0,false,pio,sm);
-            break;
-        case 'd':
-            printf("voltage down\n");
-            shiftWiper(0,true,pio,sm);
-            break;
-        case 'o':
-            adcRaw = adc_read();
-            voltDrop = (float)(adcRaw);
-            printf("voltage drop raw %f\n",voltDrop);
-            voltDrop *= 0.0007324;
-            printf("voltage drop %f\n",voltDrop);
-
-            printf("adc value %u\n",adcRaw);
-            
-
-            break;
-        default:
-            break;
-        }
-        //setVoltage(pio,sm,voltage);
+        mppt(1,3.65,pio,sm);
+        sleep_ms(100);
     }
 }
 
